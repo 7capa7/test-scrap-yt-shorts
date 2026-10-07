@@ -12,7 +12,7 @@ Zbiera:
   - datę założenia kanału, łączne wyświetlenia, subskrypcje, liczbę filmów, kraj
   - najpopularniejszy short (najwięcej wyświetleń)
   - najstarszy short
-Zapisuje do:  output/<kanał>_<data>.json  oraz dopisuje wiersz do  output/results.csv
+Zapisuje do:  output/<kanał>_<data>.json  oraz  output/results.csv (tworzony od nowa przy każdym uruchomieniu)
 """
 import argparse
 import csv
@@ -34,6 +34,50 @@ HEADERS = {
     "Cookie": "SOCS=CAI; CONSENT=YES+cb",
 }
 OUT_DIR = Path(__file__).parent / "output"
+CSV_PATH = OUT_DIR / "results.csv"
+
+# (klucz, nagłówek PL, nagłówek EN) – kolejność = kolejność kolumn w CSV
+CSV_COLUMNS = [
+    ("scraped_at",          "Data pobrania",                 "Scraped at"),
+    ("channel_url",         "Link do kanału",                "Channel URL"),
+    ("channel_name",        "Nazwa kanału",                  "Channel name"),
+    ("channel_id",          "ID kanału",                     "Channel ID"),
+    ("joined_date",         "Data założenia kanału",         "Channel created"),
+    ("total_views",         "Wyświetlenia kanału",           "Channel total views"),
+    ("subscribers",         "Subskrypcje",                   "Subscribers"),
+    ("video_count",         "Liczba filmów",                 "Video count"),
+    ("shorts_count",        "Liczba shortów",                "Shorts count"),
+    ("shorts_views_sum",    "Suma wyświetleń shortów",       "Shorts total views"),
+    ("country",             "Kraj",                          "Country"),
+    ("best_title",          "Najlepszy short – tytuł",       "Best short – title"),
+    ("best_url",            "Najlepszy short – link",        "Best short – URL"),
+    ("best_upload_date",    "Najlepszy short – data",        "Best short – upload date"),
+    ("best_views",          "Najlepszy short – wyświetlenia","Best short – views"),
+    ("best_likes",          "Najlepszy short – lajki",       "Best short – likes"),
+    ("best_comments",       "Najlepszy short – komentarze",  "Best short – comments"),
+    ("best_duration_s",     "Najlepszy short – długość (s)", "Best short – duration (s)"),
+    ("oldest_title",        "Najstarszy short – tytuł",      "Oldest short – title"),
+    ("oldest_url",          "Najstarszy short – link",       "Oldest short – URL"),
+    ("oldest_upload_date",  "Najstarszy short – data",       "Oldest short – upload date"),
+    ("oldest_views",        "Najstarszy short – wyświetlenia","Oldest short – views"),
+    ("oldest_likes",        "Najstarszy short – lajki",      "Oldest short – likes"),
+    ("oldest_comments",     "Najstarszy short – komentarze", "Oldest short – comments"),
+    ("oldest_duration_s",   "Najstarszy short – długość (s)","Oldest short – duration (s)"),
+    ("error",               "Błąd",                          "Error"),
+]
+
+
+def write_csv(rows: list[dict]):
+    """Nadpisuje CSV od zera: 2 wiersze nagłówka (PL, EN) + dane.
+    Średnik + BOM UTF-8, żeby Excel (polskie ustawienia) sam rozdzielił kolumny
+    i poprawnie pokazał polskie znaki."""
+    OUT_DIR.mkdir(exist_ok=True)
+    with CSV_PATH.open("w", newline="", encoding="utf-8-sig") as f:
+        w = csv.writer(f, delimiter=";")
+        w.writerow([pl for _, pl, _ in CSV_COLUMNS])
+        w.writerow([en for _, _, en in CSV_COLUMNS])
+        for row in rows:
+            w.writerow(["" if row.get(k) is None else row.get(k) for k, _, _ in CSV_COLUMNS])
 
 
 # ---------------------------------------------------------------- helpers
@@ -231,15 +275,21 @@ def main():
         sys.exit("Brak kanałów do sprawdzenia.")
 
     failed = []
+    rows = []
+    write_csv(rows)  # stary CSV kasujemy od razu – zostają same nagłówki
     for i, url in enumerate(urls, 1):
         print(f"\n######## [{i}/{len(urls)}] {url}")
         try:
-            scrape_channel(url, args)
+            rows.append(scrape_channel(url, args))
         except Exception as e:  # noqa: BLE001 – jeden zły kanał nie zatrzymuje reszty
             print(f"  !!! BŁĄD: {e}")
             failed.append(url)
+            rows.append({"scraped_at": datetime.now().isoformat(timespec="seconds"),
+                         "channel_url": url, "error": str(e)})
+        write_csv(rows)  # zapis po każdym kanale – przerwanie nie gubi wyników
 
     print(f"\nGotowe: {len(urls) - len(failed)}/{len(urls)} kanałów OK.")
+    print(f"CSV: {CSV_PATH}")
     if failed:
         print("Nie udało się:")
         for u in failed:
@@ -294,17 +344,10 @@ def scrape_channel(url: str, args):
     json_path = OUT_DIR / f"{handle}_{datetime.now():%Y%m%d_%H%M%S}.json"
     json_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    csv_path = OUT_DIR / "results.csv"
     row = {k: v for k, v in result.items() if not isinstance(v, dict)}
     for prefix, vid in (("best", best), ("oldest", oldest)):
         for k, v in vid.items():
             row[f"{prefix}_{k}"] = v
-    new_file = not csv_path.exists()
-    with csv_path.open("a", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=list(row.keys()))
-        if new_file:
-            w.writeheader()
-        w.writerow(row)
 
     # ---- podsumowanie
     print("\n=========== WYNIK ===========")
@@ -317,7 +360,8 @@ def scrape_channel(url: str, args):
     print(f"  {best['url']}  | {best['upload_date']} | {best['views']} wyśw. | {best['likes']} lajków")
     print(f"Najstarszy short: {oldest['title']}")
     print(f"  {oldest['url']}  | {oldest['upload_date']} | {oldest['views']} wyśw. | {oldest['likes']} lajków")
-    print(f"\nZapisano: {json_path}\n          {csv_path}")
+    print(f"\nZapisano: {json_path}")
+    return row
 
 
 if __name__ == "__main__":

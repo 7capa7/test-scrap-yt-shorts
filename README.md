@@ -76,7 +76,9 @@ Wszystko zapisuje się w folderze `output/`:
 | Plik | Co zawiera |
 |---|---|
 | `output/<kanał>_<data>.json` | pełne dane jednego kanału |
-| `output/results.csv` | jeden wiersz na każdy kanał, dopisywany przy każdym uruchomieniu; otwiera się w Excelu lub Google Sheets |
+| `output/results.csv` | tabela wszystkich kanałów: jeden wiersz na kanał, tworzona **od nowa** przy każdym uruchomieniu (stara wersja jest kasowana) |
+
+`results.csv` ma dwa wiersze nagłówka: pierwszy po polsku, drugi po angielsku. Kolumny są rozdzielone średnikiem `;`, więc w Excelu (z polskimi ustawieniami) plik otwiera się od razu rozbity na kolumny. Jeśli któryś kanał się nie uda, i tak dostaje swój wiersz z opisem błędu w kolumnie „Błąd”.
 
 ## Problemy
 
