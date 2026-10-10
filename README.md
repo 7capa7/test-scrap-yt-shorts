@@ -1,9 +1,16 @@
 # YT Shorts Scraper
 
-Dla każdego kanału z listy zbiera:
-- datę założenia kanału, łączne wyświetlenia, subskrypcje, liczbę filmów, kraj
-- liczbę shortów i sumę ich wyświetleń
-- **najpopularniejszy** i **najstarszy** short: tytuł, link, datę dodania, wyświetlenia, lajki, komentarze, długość
+Wklejasz linki do `links.txt`, a skrypt **sam rozpoznaje, co to za linki**, i zbiera odpowiednie dane:
+
+| Rodzaj linku | Przykład | Co zbiera |
+|---|---|---|
+| **Kanał** | `https://www.youtube.com/@SERHITO_SH0TY/shorts` | datę założenia kanału, łączne wyświetlenia, subskrypcje, liczbę filmów, kraj, liczbę shortów i sumę ich wyświetleń, a do tego **najpopularniejszy** i **najstarszy** short |
+| **Wyszukiwanie** | `https://www.youtube.com/results?search_query=Familienkonfikte&sp=EgQIBBAJ` | filmiki i shorty z wyników wyszukiwania; filtry ustawione na YouTube (np. „Shorts”, „ten miesiąc”) są zachowane |
+| **Hashtag** | `https://www.youtube.com/hashtag/fight/shorts` | shorty z hashtagu |
+
+Dla wyszukiwania i hashtagów każdy filmik dostaje: tytuł, link, typ (Short/Film), autora, link do autora, subskrypcje autora, datę publikacji, liczbę dni od publikacji, wyświetlenia, **wyświetlenia na dzień**, lajki, komentarze, długość, **link do miniaturki**, tagi i opis.
+
+> **Rodzaj ustala pierwszy link z listy.** Linki innego rodzaju są pomijane (skrypt wypisze, które). Na jedno uruchomienie bierzesz więc same kanały, same wyszukiwania albo same hashtagi.
 
 Nic nie instaluje w systemie. Wszystko trafia do folderu `.venv` w projekcie.
 
@@ -21,19 +28,19 @@ Na nowy komputer przenieś cały folder, ale **bez** `.venv` i `output`:
 ```
 scraper.py
 requirements.txt
-channels.txt
+links.txt
 run.sh
 ```
 
 > Nie kopiuj folderu `.venv`, bo nie zadziała na innym komputerze. Skrypt utworzy go od nowa sam.
 
-## Lista kanałów
+## Lista linków
 
-W pliku `channels.txt` wpisujesz jeden link na linię. Linie zaczynające się od `#` są pomijane.
+W pliku `links.txt` wpisujesz jeden link na linię. Linie zaczynające się od `#` są pomijane.
 
 ```
-https://www.youtube.com/@SERHITO_SH0TY/shorts
-https://www.youtube.com/@InnyKanal/shorts
+https://www.youtube.com/hashtag/fight/shorts
+https://www.youtube.com/hashtag/boxing/shorts
 ```
 
 ## Uruchomienie: macOS / Linux
@@ -51,8 +58,12 @@ Inne warianty:
 
 ```bash
 ./run.sh -f moja_lista.txt                                  # inny plik z listą
-./run.sh https://www.youtube.com/@SERHITO_SH0TY/shorts      # jeden kanał
+./run.sh https://www.youtube.com/@SERHITO_SH0TY/shorts      # jeden link
+./run.sh --limit 50                                         # 50 filmików na wyszukiwanie/hashtag (domyślnie 20)
+./run.sh --fast                                             # szybciej, ale bez lajków, dat, komentarzy i autora
 ```
+
+Przy wyszukiwaniu i hashtagach skrypt wchodzi w każdy filmik po pełne dane, więc 20 filmików to mniej więcej minuta. `--fast` pomija ten krok i zapisuje tylko to, co widać na liście wyników (tytuł, wyświetlenia, miniaturka).
 
 ## Uruchomienie: Windows
 
@@ -75,10 +86,28 @@ Wszystko zapisuje się w folderze `output/`:
 
 | Plik | Co zawiera |
 |---|---|
-| `output/<kanał>_<data>.json` | pełne dane jednego kanału |
-| `output/results.csv` | tabela wszystkich kanałów: jeden wiersz na kanał, tworzona **od nowa** przy każdym uruchomieniu (stara wersja jest kasowana) |
+| `output/RRRR-MM-DD_GG-MM-SS.csv` | tabela do Excela, np. `2026-10-10_14-32-05.csv` |
+| `output/RRRR-MM-DD_GG-MM-SS.json` | te same dane w pełnej postaci (np. całe opisy filmików) |
 
-`results.csv` ma dwa wiersze nagłówka: pierwszy po polsku, drugi po angielsku. Kolumny są rozdzielone średnikiem `;`, więc w Excelu (z polskimi ustawieniami) plik otwiera się od razu rozbity na kolumny. Jeśli któryś kanał się nie uda, i tak dostaje swój wiersz z opisem błędu w kolumnie „Błąd”.
+**Każde uruchomienie tworzy nowe pliki** z datą i godziną w nazwie, więc stare wyniki zostają.
+
+CSV ma dwa wiersze nagłówka: pierwszy po polsku, drugi po angielsku. Kolumny są rozdzielone średnikiem `;`, więc w Excelu (z polskimi ustawieniami) plik otwiera się od razu rozbity na kolumny.
+
+- **Kanały:** jeden wiersz na kanał.
+- **Wyszukiwanie / hashtagi:** wyniki są pogrupowane. Najpierw wiersz z frazą albo hashtagiem, pod nim jego filmiki, potem pusta linia i następna grupa:
+
+```
+#fight
+1  tytuł…  link…  wyświetlenia…
+2  …
+(pusta linia)
+#boxing
+1  …
+```
+
+Jeśli coś się nie uda (kanał, fraza albo pojedynczy filmik), i tak dostaje swój wiersz z opisem w kolumnie „Błąd”.
+
+**Miniaturki:** shorty też mają miniaturki. Zwykle to klatka z filmiku wybrana przez autora albo automatycznie przez YouTube. Link prowadzi do obrazka na `i.ytimg.com`.
 
 ## Problemy
 
