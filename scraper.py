@@ -7,16 +7,19 @@ Rodzaj ustala PIERWSZY link z listy, linki innego rodzaju są pomijane.
   kanał         https://www.youtube.com/@SERHITO_SH0TY/shorts
                 → data założenia, wyświetlenia kanału, najlepszy i najstarszy short
   wyszukiwanie  https://www.youtube.com/results?search_query=Familienkonfikte&sp=EgQIBBAJ
-                → statystyki filmików/shortów z wyników (filtry z `sp` są zachowane)
+                → dane filmików/shortów z listy wyników (filtry z `sp` są zachowane)
   hashtag       https://www.youtube.com/hashtag/fight/shorts
-                → statystyki shortów z hashtagu
+                → dane shortów z listy hashtagu
+
+Przy wyszukiwaniu i hashtagach brane jest tylko to, co widać na liście wyników
+(bez wchodzenia w każdy filmik), więc jest szybko.
 
 Użycie:
     python scraper.py                          # czyta linki z links.txt
     python scraper.py -f moja_lista.txt        # inny plik z listą
     python scraper.py <link> [<link> ...]
     python scraper.py --limit 50               # ile filmików na wyszukiwanie/hashtag (domyślnie 20)
-    python scraper.py --fast                   # bez wchodzenia w każdy filmik (szybciej, mniej danych)
+    python scraper.py --details                # wejdź w każdy filmik po lajki, komentarze itd. (wolno)
     python scraper.py --cookies-from-browser chrome   # gdy YouTube każe się "zalogować"
 
 Każde uruchomienie tworzy nowe pliki:  output/RRRR-MM-DD_GG-MM-SS.csv  oraz  .json
@@ -100,6 +103,8 @@ VIDEO_COLUMNS = [
     ("id",                  "ID filmu",                      "Video ID"),
     ("error",               "Błąd",                          "Error"),
 ]
+# kolumny, które da się wypełnić tylko wchodząc w filmik (--details)
+DETAIL_ONLY = {"author_subscribers", "likes", "comments", "tags"}
 
 
 # ---------------------------------------------------------------- zapis
@@ -268,7 +273,9 @@ def fmt_date(yyyymmdd):
 
 def ydl_opts(args, flat, limit=None):
     o = {"quiet": True, "no_warnings": True, "skip_download": True,
-         "extractor_args": {"youtube": {"lang": ["en"]}}}
+         "extractor_args": {"youtube": {"lang": ["en"]},
+                            # przybliżona data z "2 weeks ago" na liście wyników
+                            "youtubetab": {"approximate_date": [""]}}}
     if flat:
         o["extract_flat"] = "in_playlist"
     if limit:
@@ -481,6 +488,7 @@ def row_from_flat(e: dict) -> dict:
     if not url.startswith("http"):
         url = f"https://www.youtube.com/watch?v={vid}"
     thumbs = [t for t in (e.get("thumbnails") or []) if t.get("url")]
+    ts = e.get("timestamp")
     return {
         "id": vid,
         "url": url,
@@ -488,6 +496,7 @@ def row_from_flat(e: dict) -> dict:
         "title": e.get("title"),
         "author": e.get("channel") or e.get("uploader"),
         "author_url": e.get("channel_url") or e.get("uploader_url"),
+        "upload_date": date.fromtimestamp(ts).isoformat() if ts else None,
         "views": e.get("view_count"),
         "duration_s": e.get("duration"),
         "thumbnail": thumbs[-1]["url"] if thumbs else f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
@@ -512,7 +521,7 @@ def scrape_listing(url: str, args, ydl) -> list:
     videos = []
     for n, e in enumerate(entries, 1):
         row = {"position": n, **row_from_flat(e)}
-        if not args.fast:
+        if args.details:
             print(f"  [{n}/{len(entries)}] {row['title'] or row['id']}")
             try:
                 for k, v in video_details(ydl, row["url"]).items():
@@ -526,6 +535,7 @@ def scrape_listing(url: str, args, ydl) -> list:
 
 
 def run_listings(kind, urls, args, ydl, csv_path, json_path) -> list:
+    columns = VIDEO_COLUMNS if args.details else [c for c in VIDEO_COLUMNS if c[0] not in DETAIL_ONLY]
     rows, groups, failed = [], [], []
     for i, url in enumerate(urls, 1):
         label = listing_label(url, kind)
@@ -547,7 +557,7 @@ def run_listings(kind, urls, args, ydl, csv_path, json_path) -> list:
             rows.append({"error": error})
         groups.append({"label": label, "url": url, "error": error, "videos": videos})
         # zapis po każdej frazie – przerwanie nie gubi wyników
-        write_csv(csv_path, VIDEO_COLUMNS, rows)
+        write_csv(csv_path, columns, rows)
         write_json(json_path, kind, groups)
     return failed
 
@@ -572,8 +582,9 @@ def main():
                         "domyślnie links.txt, gdy nie podano linków")
     p.add_argument("--limit", type=int, default=20,
                    help="ile filmików brać z każdego wyszukiwania/hashtagu (domyślnie 20)")
-    p.add_argument("--fast", action="store_true",
-                   help="nie wchodź w każdy filmik – szybciej, ale bez lajków, dat, komentarzy")
+    p.add_argument("--details", action="store_true",
+                   help="wyszukiwanie/hashtag: wejdź w każdy filmik po lajki, komentarze, "
+                        "dokładną datę (dużo wolniej)")
     p.add_argument("--cookies-from-browser", metavar="BROWSER",
                    help="chrome / firefox / safari – gdy YouTube blokuje jako bota")
     args = p.parse_args()

@@ -8,7 +8,16 @@ Wklejasz linki do `links.txt`, a skrypt **sam rozpoznaje, co to za linki**, i zb
 | **Wyszukiwanie** | `https://www.youtube.com/results?search_query=Familienkonfikte&sp=EgQIBBAJ` | filmiki i shorty z wyników wyszukiwania; filtry ustawione na YouTube (np. „Shorts”, „ten miesiąc”) są zachowane |
 | **Hashtag** | `https://www.youtube.com/hashtag/fight/shorts` | shorty z hashtagu |
 
-Dla wyszukiwania i hashtagów każdy filmik dostaje: tytuł, link, typ (Short/Film), autora, link do autora, subskrypcje autora, datę publikacji, liczbę dni od publikacji, wyświetlenia, **wyświetlenia na dzień**, lajki, komentarze, długość, **link do miniaturki**, tagi i opis.
+Przy wyszukiwaniu i hashtagach skrypt bierze tylko to, co widać na liście wyników, i **nie wchodzi w każdy filmik**, więc jest szybko. Ile danych dostaniesz, zależy od tego, co YouTube pokazuje na liście:
+
+| | Hashtag (kafelki shortów) | Wyszukiwanie |
+|---|---|---|
+| tytuł, link, typ (Short/Film), wyświetlenia, **link do miniaturki** | ✅ | ✅ |
+| autor, link do autora | – | ✅ zwykle |
+| data publikacji (**przybliżona**, liczona z „2 tygodnie temu”), dni od publikacji, wyświetlenia na dzień | – | ✅ zwykle |
+| długość, fragment opisu | – | ✅ zwykle |
+
+Kafelki shortów (na hashtagach, a czasem też w wyszukiwaniu po filtrze „Shorts”) pokazują tylko tytuł i wyświetlenia, więc reszty kolumn nie da się wypełnić bez wchodzenia w filmik.
 
 > **Rodzaj ustala pierwszy link z listy.** Linki innego rodzaju są pomijane (skrypt wypisze, które). Na jedno uruchomienie bierzesz więc same kanały, same wyszukiwania albo same hashtagi.
 
@@ -60,10 +69,10 @@ Inne warianty:
 ./run.sh -f moja_lista.txt                                  # inny plik z listą
 ./run.sh https://www.youtube.com/@SERHITO_SH0TY/shorts      # jeden link
 ./run.sh --limit 50                                         # 50 filmików na wyszukiwanie/hashtag (domyślnie 20)
-./run.sh --fast                                             # szybciej, ale bez lajków, dat, komentarzy i autora
+./run.sh --details                                          # wyszukiwanie/hashtag: wejdź w każdy filmik (wolno)
 ```
 
-Przy wyszukiwaniu i hashtagach skrypt wchodzi w każdy filmik po pełne dane, więc 20 filmików to mniej więcej minuta. `--fast` pomija ten krok i zapisuje tylko to, co widać na liście wyników (tytuł, wyświetlenia, miniaturka).
+`--details` wchodzi w każdy filmik z listy i dopisuje autora, dokładną datę, lajki, komentarze, subskrypcje autora i tagi. To trwa mniej więcej minutę na 20 filmików, dlatego domyślnie jest wyłączone.
 
 ## Uruchomienie: Windows
 
