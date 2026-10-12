@@ -87,6 +87,8 @@ VIDEO_COLUMNS = [
     ("title",               "Tytuł",                         "Title"),
     ("url",                 "Link",                          "URL"),
     ("type",                "Typ",                           "Type"),
+    ("live",                "Na żywo (live)",                "Live stream"),
+    ("watching_now",        "Oglądający teraz",              "Watching now"),
     ("author",              "Autor",                         "Author"),
     ("author_url",          "Link do autora",                "Author URL"),
     ("author_subscribers",  "Subskrypcje autora",            "Author subscribers"),
@@ -103,6 +105,16 @@ VIDEO_COLUMNS = [
     ("id",                  "ID filmu",                      "Video ID"),
     ("error",               "Błąd",                          "Error"),
 ]
+# live_status z yt-dlp -> wartość w CSV (brak statusu = zwykły filmik)
+LIVE_LABELS = {
+    None: "Nie",
+    "not_live": "Nie",
+    "is_live": "Tak – trwa teraz",
+    "was_live": "Tak – był na żywo",
+    "post_live": "Tak – był na żywo",
+    "is_upcoming": "Zaplanowany live",
+}
+
 # kolumny, które da się wypełnić tylko wchodząc w filmik (--details)
 DETAIL_ONLY = {"author_subscribers", "likes", "comments", "tags"}
 
@@ -300,6 +312,8 @@ def video_details(ydl, url: str) -> dict:
         "likes": v.get("like_count"),
         "comments": v.get("comment_count"),
         "duration_s": v.get("duration"),
+        "live": LIVE_LABELS.get(v.get("live_status"), v.get("live_status")),
+        "watching_now": v.get("concurrent_view_count"),
         "thumbnail": v.get("thumbnail"),
         "tags": v.get("tags") or None,
         "description": v.get("description"),
@@ -438,22 +452,37 @@ def run_channels(urls, args, ydl, csv_path, json_path) -> list:
 
 # ---------------------------------------------------------------- tryb: wyszukiwanie / hashtag
 
+def live_status_of_renderer(vr: dict):
+    """Status live z kafelka filmiku (tak samo jak liczy go yt-dlp)."""
+    if vr.get("upcomingEventData"):
+        return "is_upcoming"
+    marks = json.dumps([vr.get("thumbnailOverlays"), vr.get("badges")])
+    if '"LIVE"' in marks or "BADGE_STYLE_TYPE_LIVE_NOW" in marks:
+        return "is_live"
+    if "streamed" in (text_of(vr.get("publishedTimeText")) or "").lower():
+        return "was_live"
+    return None
+
+
 def entries_from_page(url: str) -> list:
     """Zapasowo: wyciąga ID filmików prosto z HTML-a strony (tylko pierwsza porcja wyników)."""
     data = initial_data(http_get(url))
     out, seen = [], set()
 
-    def add(vid, is_short):
+    def add(vid, is_short, live_status=None):
         if vid and vid not in seen:
             seen.add(vid)
-            out.append({"id": vid, "url": (f"https://www.youtube.com/shorts/{vid}" if is_short
-                                           else f"https://www.youtube.com/watch?v={vid}")})
+            out.append({"id": vid, "live_status": live_status,
+                        "url": (f"https://www.youtube.com/shorts/{vid}" if is_short
+                                else f"https://www.youtube.com/watch?v={vid}")})
 
     def walk(o):
         if isinstance(o, dict):
             vr = o.get("videoRenderer")
             if isinstance(vr, dict):
-                add(vr.get("videoId"), find_key(vr.get("navigationEndpoint") or {}, "reelWatchEndpoint") is not None)
+                add(vr.get("videoId"),
+                    find_key(vr.get("navigationEndpoint") or {}, "reelWatchEndpoint") is not None,
+                    live_status_of_renderer(vr))
             rw = o.get("reelWatchEndpoint")
             if isinstance(rw, dict):
                 add(rw.get("videoId"), True)
@@ -493,6 +522,8 @@ def row_from_flat(e: dict) -> dict:
         "id": vid,
         "url": url,
         "type": "Short" if "/shorts/" in url else "Film",
+        "live": LIVE_LABELS.get(e.get("live_status"), e.get("live_status")),
+        "watching_now": e.get("concurrent_view_count"),
         "title": e.get("title"),
         "author": e.get("channel") or e.get("uploader"),
         "author_url": e.get("channel_url") or e.get("uploader_url"),

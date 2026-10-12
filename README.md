@@ -13,6 +13,7 @@ Przy wyszukiwaniu i hashtagach skrypt bierze tylko to, co widać na liście wyni
 | | Hashtag (kafelki shortów) | Wyszukiwanie |
 |---|---|---|
 | tytuł, link, typ (Short/Film), wyświetlenia, **link do miniaturki** | ✅ | ✅ |
+| czy to live: „Nie”, „Tak – trwa teraz”, „Tak – był na żywo”, „Zaplanowany live”; przy trwającym live także liczba oglądających teraz | – (shorty nie są live) | ✅ |
 | autor, link do autora | – | ✅ zwykle |
 | data publikacji (**przybliżona**, liczona z „2 tygodnie temu”), dni od publikacji, wyświetlenia na dzień | – | ✅ zwykle |
 | długość, fragment opisu | – | ✅ zwykle |
