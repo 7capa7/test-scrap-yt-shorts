@@ -81,6 +81,12 @@ CHANNEL_COLUMNS = [
     ("error",               "Błąd",                          "Error"),
 ]
 
+# pierwsza kolumna przy wyszukiwaniu / hashtagach: skąd pochodzi wiersz
+SOURCE_COLUMN = {
+    "search":  ("source", "Fraza wyszukiwania", "Search query"),
+    "hashtag": ("source", "Hashtag",            "Hashtag"),
+}
+
 # kolumny dla wyszukiwania i hashtagów
 VIDEO_COLUMNS = [
     ("position",            "Nr",                            "No."),
@@ -137,7 +143,6 @@ def csv_cell(v):
 
 def write_csv(path: Path, columns, rows):
     """Zapisuje CSV od zera: 2 wiersze nagłówka (PL, EN) + dane.
-    Wiersz-słownik = dane w kolumnach, wiersz-lista = wpisany tak jak jest (np. nagłówek sekcji).
     Średnik + BOM UTF-8, żeby Excel (polskie ustawienia) sam rozdzielił kolumny
     i poprawnie pokazał polskie znaki."""
     with path.open("w", newline="", encoding="utf-8-sig") as f:
@@ -145,10 +150,7 @@ def write_csv(path: Path, columns, rows):
         w.writerow([pl for _, pl, _ in columns])
         w.writerow([en for _, _, en in columns])
         for row in rows:
-            if isinstance(row, dict):
-                w.writerow([csv_cell(row.get(k)) for k, _, _ in columns])
-            else:
-                w.writerow([csv_cell(x) for x in row])
+            w.writerow([csv_cell(row.get(k)) for k, _, _ in columns])
 
 
 def write_json(path: Path, kind: str, items):
@@ -566,7 +568,8 @@ def scrape_listing(url: str, args, ydl) -> list:
 
 
 def run_listings(kind, urls, args, ydl, csv_path, json_path) -> list:
-    columns = VIDEO_COLUMNS if args.details else [c for c in VIDEO_COLUMNS if c[0] not in DETAIL_ONLY]
+    columns = [SOURCE_COLUMN[kind]] + [c for c in VIDEO_COLUMNS
+                                       if args.details or c[0] not in DETAIL_ONLY]
     rows, groups, failed = [], [], []
     for i, url in enumerate(urls, 1):
         label = listing_label(url, kind)
@@ -580,12 +583,12 @@ def run_listings(kind, urls, args, ydl, csv_path, json_path) -> list:
             print(f"  !!! BŁĄD: {error}")
             failed.append(url)
 
-        if rows:
-            rows.append([])          # pusta linia między sekcjami
-        rows.append([label, url])    # nagłówek sekcji: fraza / #hashtag
+        # płaska tabela: każdy wiersz ma swoją frazę / #hashtag, żeby dało się filtrować w Excelu
+        for v in videos:
+            v["source"] = label
         rows.extend(videos)
         if error:
-            rows.append({"error": error})
+            rows.append({"source": label, "error": error})
         groups.append({"label": label, "url": url, "error": error, "videos": videos})
         # zapis po każdej frazie – przerwanie nie gubi wyników
         write_csv(csv_path, columns, rows)
